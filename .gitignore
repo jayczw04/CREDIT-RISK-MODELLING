@@ -1,0 +1,17 @@
+# Data (too big for GitHub + licensing)
+data/
+*.csv
+*.csv.gz
+*.zip
+*.xlsx
+~$*
+
+# Python environment & caches
+.venv/
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+
+# Mac / editor junk
+.DS_Store
+.vscode/
