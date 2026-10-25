@@ -1,6 +1,6 @@
 # Credit Risk Modelling: Probability of Default (PD) Scorecard
 
-Predicting the probability that a consumer loan defaults, using ~2M LendingClub loans (2007–2018).
+Predicting the probability that a consumer loan defaults, using LendingClub loan data (2007–2018).
 Built the way a bank risk team would: an interpretable **WoE logistic-regression scorecard** (champion)
 benchmarked against a **LightGBM** model (challenger), validated **out-of-time**, and turned into a
 **credit cut-off strategy**.
@@ -18,9 +18,9 @@ converts it into a credit score, and recommends an approval cut-off that balance
 Extension: **Expected Loss = PD × LGD × EAD** (Basel / IFRS 9 framing).
 
 ## 2. Data
-- **Source:** [LendingClub loan data on Kaggle](https://www.kaggle.com/datasets/wordsforthewise/lending-club): `accepted_2007_to_2018Q4.csv.gz`
-- **Size:** ~2.2M loans × ~150 features
-- Data is **not included** in this repo (size + licensing). Download it and place it in `data/raw/`.
+- **Source:** [LendingClub loan data on Kaggle](https://www.kaggle.com/datasets/wordsforthewise/lending-club): `accepted_2007_to_2018Q4.csv.gz` (~2.2M loans × ~150 features)
+- **Sample:** a 3% random sample (seed 42, ~68k loans) created with `src/make_sample.py`, to keep development fast
+- Data is **not included** in this repo (size + licensing). Download it and place it in `data/`.
 
 **Target definition**
 | `loan_status` | Target |
@@ -28,53 +28,76 @@ Extension: **Expected Loss = PD × LGD × EAD** (Basel / IFRS 9 framing).
 | Charged Off, Default | 1 (bad) |
 | Fully Paid | 0 (good) |
 | Current, Late, In Grace Period | Excluded (outcome unknown) |
+| "Does not meet the credit policy" | Excluded (approved under older underwriting rules) |
 
-Only loans issued early enough to have reached an outcome are used, to avoid bias toward early defaults.
+**Modelling population**
+| Filter | Reason |
+|---|---|
+| Individual applications only | Joint applications started in late 2015, with too few matured loans to model |
+| 36-month loans only | Most 60-month loans issued from 2014 had not matured by the data cut-off |
+| Issued 2007–2015 | Later vintages are mostly still running (right-censoring) |
+
+➡️ **18,557 loans, 13.9% default rate**
 
 ## 3. Approach
-1. **Leakage control:** removed all post-origination variables (payments received, recoveries,
+1. **Leakage control:** removed 38 post-origination variables (payments received, recoveries,
    last FICO pull, hardship/settlement fields). Only information available at application is used.
-2. **EDA:** default rates by grade, term, purpose, FICO band, DTI.
-3. **Feature engineering:** credit history length, payment-to-income, loan-to-income, etc.
-4. **Out-of-time split:** train on earlier vintages, test on a later vintage (mirrors real deployment).
-5. **Champion model:** WoE binning + Information Value feature selection → logistic regression scorecard.
-6. **Challenger model:** LightGBM, explained with SHAP.
-7. **Scorecard scaling:** PD → points (e.g. 600 points = 50:1 odds, PDO = 20).
-8. **Strategy:** approval rate vs bad rate trade-off and recommended cut-off.
+2. **Data cleaning:** dropped IDs, free text and columns that are >90% empty or constant;
+   converted dates, `term` and `emp_length` to numbers.
+3. **Fairness:** excluded `zip_code` because location can act as a proxy for protected
+   characteristics under US fair-lending law (ECOA).
+4. **EDA:** default rates by grade, FICO band and other key variables.
+5. **Feature engineering:** credit history length, payment-to-income, DTI including the new loan, etc.
+6. **Out-of-time split:** train on 2007–2014, test on 2015 (mirrors real deployment).
+7. **Champion model:** WoE binning + Information Value feature selection → logistic regression scorecard.
+8. **Challenger model:** LightGBM, explained with SHAP.
+9. **Scorecard scaling:** PD → points (e.g. 600 points = 50:1 odds, PDO = 20).
+10. **Strategy:** approval rate vs bad rate trade-off and recommended cut-off.
 
-## 4. Results *(TBD)*
+## 4. Key findings (EDA)
+![Default rate by grade](reports/figures/default_by_grade.png)
+
+- Default rates rise steadily from grade A (5.4%) to G (64.7%, but based on only 17 loans).
+- Borrowers with FICO 660–679 defaulted at 18.4%, about **4.6×** the rate of those with FICO 750+ (4.0%).
+
+## 5. Results *(TBD)*
 | Model | AUC | Gini | KS |
 |---|---|---|---|
 | LendingClub grade (benchmark) | TBD | TBD | TBD |
 | WoE Logistic Scorecard | TBD | TBD | TBD |
 | LightGBM | TBD | TBD | TBD |
 
-*Charts to add: default rate by grade, ROC curves, calibration plot, score distribution, cut-off trade-off.*
-
-## 5. Business impact *(TBD)*
+## 6. Business impact *(TBD)*
 *e.g. "At a cut-off of X points, the bad rate falls from A% to B% while keeping a C% approval rate."*
 
-## 6. Project structure
+## 7. Project structure
 ```
 credit-risk-modelling/
-├── data/                 # not tracked: raw & processed data
-├── notebooks/            # EDA and modelling notebooks
-├── src/                  # reusable scripts (cleaning, features, modelling)
-├── reports/figures/      # charts used in this README
+├── data/                   # not tracked: raw data & sample
+├── notebooks/
+│   ├── 01_explore.ipynb    # first look at the data
+│   └── 02_eda.ipynb        # default rates by variable
+├── src/
+│   ├── make_sample.py      # creates the 3% random sample
+│   └── data_cleaning.py    # leakage removal, cleaning, target definition
+├── reports/figures/        # charts used in this README
 ├── requirements.txt
 └── README.md
 ```
 
-## 7. How to run
+## 8. How to run
 ```bash
-git clone https://github.com/<your-username>/credit-risk-modelling.git
+git clone https://github.com/jayczw04/credit-risk-modelling.git
 cd credit-risk-modelling
 python3 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
-# download accepted_2007_to_2018Q4.csv.gz into data/raw/
+# download accepted_2007_to_2018Q4.csv.gz into data/
+python src/make_sample.py
 ```
 
-## 8. Limitations & next steps
+## 9. Limitations & next steps
+- **Sample-based:** built on a 3% sample. Final results should be confirmed on the full dataset.
+- **Scope:** individual, 36-month loans only. Joint and 60-month loans would need their own models.
 - **Selection bias:** the model only sees approved applicants. Reject inference using
   `rejected_2007_to_2018Q4.csv.gz` is a possible extension.
 - Add **LGD** and **EAD** models to estimate Expected Loss.
