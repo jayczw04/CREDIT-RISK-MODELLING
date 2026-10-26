@@ -55,10 +55,11 @@ Extension: **Expected Loss = PD × LGD × EAD** (Basel / IFRS 9 framing).
 10. **Strategy:** approval rate vs bad rate trade-off and recommended cut-off.
 
 ## 4. Key findings (EDA)
-![Default rate by grade](reports/figures/default_by_grade.png)
+![Default rate by grade](reports/figures/default_by_grade_and_fico.png)
 
 - Default rates rise steadily from grade A (5.4%) to G (64.7%, but based on only 17 loans).
 - Borrowers with FICO 660–679 defaulted at 18.4%, about **4.6×** the rate of those with FICO 750+ (4.0%).
+- A single variable like FICO separates default rates by 4.6×, but multi-factor models achieve 12× separation. The scorecard leverages multiple variables simultaneously to match or beat this higher standard of risk differentiation.
 
 ## 5. Results *(TBD)*
 | Model | AUC | Gini | KS |
